@@ -1,4 +1,76 @@
 package ru.practicum.tests;
 
-public class UserLoginTest {
+import io.qameta.allure.junit4.DisplayName;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import ru.practicum.model.User;
+import ru.practicum.model.UserLogin;
+import ru.practicum.steps.UserSteps;
+import java.util.Map;
+import static org.hamcrest.CoreMatchers.is;
+
+public class UserLoginTest extends BaseTest {
+
+    private UserSteps userSteps = new UserSteps();
+    private User user;
+    private Map<String, Object> authToken;
+
+    @Before
+    public void setUp() {
+        String randomLocalPart = RandomStringUtils.randomAlphanumeric(8);
+        String domain = "yandex.ru";
+
+        user = new User();
+        user.setEmail(randomLocalPart + "@" + domain);
+        user.setName(RandomStringUtils.randomAlphabetic(8));
+        user.setPassword(RandomStringUtils.randomAlphabetic(8));
+
+        authToken = userSteps.registerUserAndGetTokens(user);
+    }
+
+    @Test
+    @DisplayName("Логин под существующим пользователем")
+    public void userLogin() {
+        UserLogin correctCredentials = new UserLogin(user.getEmail(), user.getPassword());
+        userSteps
+                .userLogin(correctCredentials)
+                .statusCode(200);
+    }
+
+    @Test
+    @DisplayName("Логин с неверным email")
+    public void userLoginWithWrongEmail() {
+        String wrongEmail = RandomStringUtils.randomAlphanumeric(8) + "@example.com";
+        UserLogin incorrectCredentials = new UserLogin(wrongEmail, user.getPassword());
+
+        userSteps
+                .userLogin(incorrectCredentials)
+                .statusCode(401)
+                .body("success", is(false))
+                .body("message", is("email or password are incorrect"));
+    }
+
+    @Test
+    @DisplayName("Логин с неверным паролем")
+    public void userLoginWithWrongPassword() {
+        String wrongPassword = RandomStringUtils.randomAlphabetic(12);
+        UserLogin incorrectCredentials = new UserLogin(user.getEmail(), wrongPassword);
+
+        userSteps
+                .userLogin(incorrectCredentials)
+                .statusCode(401)
+                .body("success", is(false))
+                .body("message", is("email or password are incorrect"));
+    }
+
+    @After
+    @DisplayName("Удаление созданных пользователей")
+    public void cleanUpUsers() {
+        if (authToken != null && !authToken.isEmpty()) {
+            userSteps.setAccessToken(authToken.get("accessToken").toString());
+            userSteps.deleteUser();
+        }
+    }
 }
