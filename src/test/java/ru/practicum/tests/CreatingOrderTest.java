@@ -1,5 +1,6 @@
 package ru.practicum.tests;
 
+import io.qameta.allure.Description;
 import io.qameta.allure.junit4.DisplayName;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
@@ -11,6 +12,10 @@ import ru.practicum.steps.OrderSteps;
 import ru.practicum.steps.UserSteps;
 import java.util.*;
 import static org.hamcrest.Matchers.*;
+import static org.apache.http.HttpStatus.SC_OK;
+import static org.apache.http.HttpStatus.SC_UNAUTHORIZED;
+import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
+import static org.apache.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
 
 
 public class CreatingOrderTest extends BaseTest {
@@ -39,26 +44,28 @@ public class CreatingOrderTest extends BaseTest {
 
     @Test
     @DisplayName("Создание заказа с авторизацией")
+    @Description("Проверяем создание успешного заказа при наличии валидной авторизации пользователя")
     public void сreateOrderWithAuthorizationTest() {
 
         List<String> ingredients = Arrays.asList("61c0c5a71d1f82001bdaaa6d", "61c0c5a71d1f82001bdaaa6c");
         Order order = new Order(ingredients);
 
         orderSteps.createOrder(order)
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("success", equalTo(true))
                 .body("order.number", not(nullValue()));
     }
 
     @Test
     @DisplayName("Создание заказа без авторизации")
+    @Description("Проверяем невозможность создания заказа без авторизационного токена")
     public void createOrderWithoutAuthenticationTest() {
         List<String> ingredients = Arrays.asList("61c0c5a71d1f82001bdaaa6d", "61c0c5a71d1f82001bdaaa6c");
         Order order = new Order(ingredients);
 
         orderSteps.setAccessToken("");
         orderSteps.createOrder(order)
-                .statusCode(401)
+                .statusCode(SC_UNAUTHORIZED)
                 .body("success", equalTo(false))
                 .body("message", containsString("Unauthorized"));
         // Баг на сервере, приходит другой ответ, отличный от ОР.
@@ -66,23 +73,25 @@ public class CreatingOrderTest extends BaseTest {
 
     @Test
     @DisplayName("Создание заказа после авторизации без ингредиентов")
+    @Description("Проверяем ошибку при отправке пустого списка ингредиентов для формирования заказа")
     public void createOrderWithoutIngredientsTest() {
         Order order = new Order(new ArrayList<>());
 
         orderSteps.createOrder(order)
-                .statusCode(400)
+                .statusCode(SC_BAD_REQUEST)
                 .body("success", equalTo(false))
                 .body("message", containsString("Ingredient ids must be provided"));
     }
 
     @Test
     @DisplayName("Создание заказа с неверным хешем ингредиентов")
+    @Description("Проверяем обработку некорректных данных (невалидные ингредиенты). Ожидается внутренний сбой сервера")
     public void createOrderWithInvalidIngredientsTest() {
         List<String> invalidIngredients = Arrays.asList("invalid_hash_1", "invalid_hash_2");
         Order order = new Order(invalidIngredients);
 
         orderSteps.createOrder(order)
-                .statusCode(500);
+                .statusCode(SC_INTERNAL_SERVER_ERROR);
     }
 
     @After

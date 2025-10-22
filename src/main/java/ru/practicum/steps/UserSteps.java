@@ -1,7 +1,7 @@
 package ru.practicum.steps;
 
 import io.qameta.allure.Step;
-import io.restassured.response.ValidatableResponse;
+import io.restassured.response.Response;
 import ru.practicum.model.User;
 import ru.practicum.model.UserLogin;
 import java.util.HashMap;
@@ -15,45 +15,54 @@ public class UserSteps {
     public static final String USER_DELETE = "/api/auth/user";
 
     private String accessToken;
+    private Response lastResponse;
 
     public void setAccessToken(String token) {
         this.accessToken = token;
     }
 
     @Step("Отправка запроса на регистрацию пользователя")
-    public ValidatableResponse sendRegisterRequest(User user) {
-        return given()
+    public Response  sendRegisterRequest(User user) {
+        this.lastResponse = given()
                 .body(user)
-                .post(USER_CREATE)
-                .then();
+                .when()
+                .post(USER_CREATE);
+        return this.lastResponse;
+    }
+
+    public Response getLastResponse() {
+        return this.lastResponse;
     }
 
     @Step("Регистрация нового пользователя и возврат токенов")
     public Map<String, Object> registerUserAndGetTokens(User user) {
-        ValidatableResponse response = sendRegisterRequest(user);
-        response.statusCode(200);
+        Response response = sendRegisterRequest(user);
+        int statusCode = response.getStatusCode();
+        if (statusCode != 200) {
+            throw new AssertionError("Неверный статус HTTP: ожидалось 200, получено " + statusCode);
+        }
 
         Map<String, Object> tokens = new HashMap<>();
-        tokens.put("accessToken", response.extract().path("accessToken"));
-        tokens.put("refreshToken", response.extract().path("refreshToken"));
+        tokens.put("accessToken", response.path("accessToken"));
+        tokens.put("refreshToken", response.path("refreshToken"));
         return tokens;
     }
 
 
     @Step("Авторизация пользователя")
-    public ValidatableResponse userLogin(UserLogin userLogin) {
+    public Response userLogin(UserLogin userLogin) {
         return given()
                 .body(userLogin)
-                .post(USER_LOGIN)
-                .then();
+                .when()
+                .post(USER_LOGIN);
     }
 
 
     @Step("Удаление пользователя")
-    public ValidatableResponse deleteUser() {
+    public Response deleteUser() {
         return given()
                 .header("Authorization", this.accessToken)
-                .delete(USER_DELETE)
-                .then();
+                .when()
+                .delete(USER_DELETE);
     }
 }
